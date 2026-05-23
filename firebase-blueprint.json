@@ -1,0 +1,232 @@
+{
+  "entities": {
+    "Incident": {
+      "title": "Incident",
+      "description": "A reported police incident",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "status": { "type": "string", "enum": ["Open", "In Progress", "Closed"] },
+        "date": { "type": "string" },
+        "location": { "type": "string" },
+        "lat": { "type": "number" },
+        "lng": { "type": "number" },
+        "officerId": { "type": "string" },
+        "filingStation": { "type": "string" },
+        "recordingOfficerName": { "type": "string" },
+        "recordingOfficerRank": { "type": "string" },
+        "type": { "type": "string", "enum": ["Crime", "Traffic"] },
+        "category": { "type": "string" },
+        "description": { "type": "string" },
+        "photos": { "type": "array", "items": { "type": "string" } },
+        "trafficDetails": { "$ref": "#/entities/TrafficDetails" }
+      },
+      "required": ["id", "title", "status", "date", "location", "officerId", "type", "category"]
+    },
+    "TrafficDetails": {
+      "title": "TrafficDetails",
+      "description": "Details specifically for traffic accidents",
+      "type": "object",
+      "properties": {
+        "accidentType": { "type": "string" },
+        "accidentImpact": { "type": "string" },
+        "numDeaths": { "type": "number" },
+        "numHeavyInjuries": { "type": "number" },
+        "numLightInjuries": { "type": "number" },
+        "propertyDamageEstimate": { "type": "string" },
+        "driverExperience": { "type": "string" },
+        "vehicleType": { "type": "string" },
+        "plateNumber": { "type": "string" },
+        "licenseGrade": { "type": "string" },
+        "accidentCause": { "type": "string" },
+        "reporterName": { "type": "string" },
+        "reporterAddress": { "type": "string" },
+        "reporterPhone": { "type": "string" }
+      }
+    },
+    "CommunityReport": {
+      "title": "CommunityReport",
+      "description": "A report submitted by a citizen",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "reporterName": { "type": "string" },
+        "reporterPhone": { "type": "string" },
+        "reporterEmail": { "type": "string" },
+        "location": { "type": "string" },
+        "date": { "type": "string" },
+        "details": { "type": "string" },
+        "status": { "type": "string", "enum": ["New", "Reviewed", "Action Taken"] },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "reporterName", "reporterPhone", "location", "date", "details", "status", "timestamp"]
+    },
+    "Officer": {
+      "title": "Officer",
+      "description": "A police officer",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "badgeNumber": { "type": "string" },
+        "rank": { "type": "string" },
+        "email": { "type": "string" },
+        "station": { "type": "string" },
+        "phone": { "type": "string" },
+        "status": { "type": "string", "enum": ["Active", "On Leave", "Suspended"] }
+      },
+      "required": ["id", "name", "badgeNumber", "rank", "email", "status"]
+    },
+    "Assignment": {
+      "title": "Assignment",
+      "description": "A task assigned to an officer",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Completed"] },
+        "dueDate": { "type": "string" },
+        "incidentId": { "type": "string" },
+        "officerId": { "type": "string" }
+      },
+      "required": ["id", "title", "status", "dueDate", "officerId"]
+    },
+    "Report": {
+      "title": "Report",
+      "description": "An official police report",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "status": { "type": "string", "enum": ["Submitted", "Pending Review"] },
+        "date": { "type": "string" },
+        "location": { "type": "string" },
+        "officerId": { "type": "string" },
+        "filingStation": { "type": "string" },
+        "recordingOfficerName": { "type": "string" },
+        "recordingOfficerRank": { "type": "string" },
+        "type": { "type": "string", "enum": ["Crime", "Traffic"] },
+        "category": { "type": "string" },
+        "description": { "type": "string" }
+      },
+      "required": ["id", "title", "status", "date", "location", "officerId", "type", "category"]
+    },
+    "CorruptionReport": {
+      "title": "CorruptionReport",
+      "description": "A corruption tip report",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tipType": { "type": "string" },
+        "reporterName": { "type": "string" },
+        "reporterPhone": { "type": "string" },
+        "reporterEmail": { "type": "string" },
+        "location": { "type": "string" },
+        "woreda": { "type": "string" },
+        "details": { "type": "string" },
+        "otherInfo": { "type": "string" },
+        "status": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      }
+    },
+    "TrafficPoliceContact": {
+      "title": "TrafficPoliceContact",
+      "description": "Contact info for traffic police",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "category": { "type": "string" }
+      }
+    },
+    "CorruptionReport": {
+      "title": "CorruptionReport",
+      "description": "Report of corruption or unethical behavior",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tipType": { "type": "string" },
+        "reporterName": { "type": "string" },
+        "reporterPhone": { "type": "string" },
+        "reporterEmail": { "type": "string" },
+        "details": { "type": "string" },
+        "location": { "type": "string" },
+        "woreda": { "type": "string" },
+        "other": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "status": { "type": "string" }
+      }
+    },
+    "User": {
+      "title": "User",
+      "description": "A system user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["Admin", "Officer"] },
+        "avatar": { "type": "string" }
+      },
+      "required": ["id", "name", "email", "role"]
+    },
+    "ZoneReport": {
+      "title": "ZoneReport",
+      "description": "Detailed police report for a specific zone/wereda",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "officer_name": { "type": "string" },
+        "officer_id": { "type": "string" },
+        "deputy_dept": { "type": "string" },
+        "main_dept": { "type": "string" },
+        "wereda": { "type": "string" },
+        "report_type": { "type": "string", "enum": ["Monthly", "Quarterly", "6-Month", "9-Month", "Annual"] },
+        "photo_url": { "type": "string" },
+        "document_url": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "officer_name", "officer_id", "deputy_dept", "main_dept", "wereda", "report_type", "timestamp"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "A message in the AI assistant chat",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "text": { "type": "string" },
+        "sender": { "type": "string", "enum": ["user", "ai"] },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "userId": { "type": "string" }
+      },
+      "required": ["id", "text", "sender", "timestamp", "userId"]
+    },
+    "PoliceScan": {
+      "title": "PoliceScan",
+      "description": "A record of a scanned QR/Barcode",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "data": { "type": "string" },
+        "officerId": { "type": "string" },
+        "officerName": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "data", "officerId", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/WestGojjam_Reports": { "schema": "Incident", "description": "Collection of police incidents" },
+    "/officers": { "schema": "Officer", "description": "Collection of police officers" },
+    "/assignments": { "schema": "Assignment", "description": "Collection of officer assignments" },
+    "/reports": { "schema": "Report", "description": "Collection of official reports" },
+    "/users": { "schema": "User", "description": "Collection of system users" },
+    "/zone_detailed_reports": { "schema": "ZoneReport", "description": "Detailed zone reports" },
+    "/chat_messages": { "schema": "ChatMessage", "description": "AI Assistant chat history" },
+    "/police_scans": { "schema": "PoliceScan", "description": "Collection of police scans" },
+    "/community_reports": { "schema": "CommunityReport", "description": "Citizen reported tips and crimes" }
+  }
+}

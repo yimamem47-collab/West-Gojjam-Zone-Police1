@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <link rel="icon" type="image/png" href="/police-logo.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="theme-color" content="#002B5B" />
+    <title>West Gojjam Zone Police Management System</title>
+    <script>
+      // Safety check to prevent ReferenceError: VitePWA is not defined
+      // This can happen if old cached code tries to access it
+      (function() {
+        var stub = function() { 
+          console.log('VitePWA called as function'); 
+          return stub; 
+        };
+        stub.registerServiceWorker = function() { console.log('VitePWA.registerServiceWorker stub called'); };
+        stub.updateServiceWorker = function() { console.log('VitePWA.updateServiceWorker stub called'); };
+        
+        window.VitePWA = window.VitePWA || stub;
+        // Global var for strict mode modules
+        window.VitePWA_Stub = true;
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
