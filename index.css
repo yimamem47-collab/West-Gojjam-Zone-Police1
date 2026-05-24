@@ -1,0 +1,116 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+Ethiopic:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+:root {
+  --ion-safe-area-top: env(safe-area-inset-top);
+}
+
+body.barcode-scanner-active {
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+html.barcode-scanner-active {
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+body.barcode-scanner-active * {
+  visibility: hidden;
+}
+
+body.barcode-scanner-active .fixed.inset-0.z-\[200\] {
+  visibility: visible !important;
+  background-color: transparent !important;
+}
+
+body.barcode-scanner-active .fixed.inset-0.z-\[200\] * {
+  visibility: visible !important;
+}
+
+@theme {
+  --font-sans: "Inter", "Noto Sans Ethiopic", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  --color-brand-bg: #1A237E;
+  --color-brand-card: #283593;
+  --color-brand-border: #3949AB;
+  --color-brand-accent: #FFD700;
+  --color-brand-text-primary: #FFFFFF;
+  --color-brand-text-secondary: #E8EAF6;
+}
+
+@layer base {
+  html, body {
+    overflow: hidden;
+    height: 100%;
+    position: fixed;
+    width: 100%;
+    overscroll-behavior-y: none;
+    @apply bg-brand-bg text-brand-text-primary font-sans antialiased;
+    margin: 0;
+    padding: 0;
+    background-image: radial-gradient(circle at top right, rgba(255, 215, 0, 0.05), transparent),
+                      radial-gradient(circle at bottom left, rgba(255, 215, 0, 0.05), transparent);
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-brand-card border border-brand-border rounded-2xl shadow-lg shadow-indigo-500/5;
+    will-change: transform, opacity;
+  }
+  
+  .btn-primary {
+    @apply bg-brand-accent text-brand-bg font-bold py-2 px-4 rounded-xl transition-all hover:scale-105 active:scale-95 shadow-lg shadow-brand-accent/20 flex items-center justify-center gap-2;
+  }
+
+  .btn-secondary {
+    @apply bg-brand-card text-brand-text-primary border border-brand-border font-bold py-2 px-4 rounded-xl transition-all hover:bg-brand-border active:scale-95 flex items-center justify-center gap-2;
+  }
+  
+  .input-field {
+    @apply bg-white border border-brand-border text-brand-bg rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-brand-accent/50 transition-all w-full shadow-md font-medium;
+  }
+
+  .badge-active {
+    @apply bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .badge-completed {
+    @apply bg-brand-accent/10 text-brand-accent border border-brand-accent/20 px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .badge-todo {
+    @apply bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .badge-done {
+    @apply bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .badge-paid {
+    @apply bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .badge-unpaid {
+    @apply bg-rose-500/10 text-rose-400 border border-rose-500/20 px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-brand-border rounded-full;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    @apply bg-brand-accent/50;
+  }
+
+  .overflow-y-auto {
+    overscroll-behavior-y: none;
+  }
+}
