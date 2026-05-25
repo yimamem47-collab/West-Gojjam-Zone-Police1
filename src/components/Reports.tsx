@@ -77,29 +77,45 @@ export function Reports({
     filingStation: '',
     recordingOfficerName: officers[0]?.name || '',
     recordingOfficerRank: officers[0]?.rank || 'constable',
-    type: 'Crime',
-    category: 'other',
-    description: '',
-    photos: [],
-    documents: [],
-    voice_url: '',
-    trafficDetails: defaultTrafficDetails
-  };
+  <div className="grid grid-cols-4 gap-4">
+  {(newReport.photos || []).map((photo, index) => (
+    <div
+      key={index}
+      className="relative aspect-square rounded-xl overflow-hidden border border-brand-border group"
+    >
+      <img
+        src={photo}
+        alt="Report"
+        className="w-full h-full object-cover"
+      />
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingReport, setEditingReport] = useState<Report | null>(null);
+      <button
+        type="button"
+        onClick={() => removePhoto(index)}
+        className="absolute top-1 right-1 p-1 bg-rose-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+      >
+        <Trash2 size={12} />
+      </button>
+    </div>
+  ))}
 
-  const [newReport, setNewReport] =
-    useState<Omit<Report, 'id'>>(defaultReport);
+  {(newReport.photos || []).length < 10 && (
+    <button
+      type="button"
+      onClick={handlePhotoUpload}
+      className="aspect-square rounded-xl border-2 border-dashed border-brand-border flex flex-col items-center justify-center gap-2 hover:border-brand-accent hover:bg-brand-accent/5 transition-all cursor-pointer"
+    >
+      <Camera
+        size={24}
+        className="text-brand-text-secondary"
+      />
 
-  const [currentStep, setCurrentStep] = useState(1);
-
-  const [selectedDocs, setSelectedDocs] = useState<
-    { blob: Blob; name: string }[]
-  >([]);
-
-  const [isSubmitting, setIsSubmitting] = useState(false);
+      <span className="text-[10px] uppercase font-bold text-brand-text-secondary">
+        ፎቶ
+      </span>
+    </button>
+  )}
+</div>
 
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
