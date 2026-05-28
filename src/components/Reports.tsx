@@ -66,6 +66,7 @@ export function Reports({ reports, officers, lang, initialEditId, onAdd, onUpdat
       }
     }
   }, [initialEditId, reports]);
+
   const [newReport, setNewReport] = useState<Omit<Report, 'id'>>({
     title: '',
     status: 'Pending Review',
@@ -235,7 +236,7 @@ export function Reports({ reports, officers, lang, initialEditId, onAdd, onUpdat
           ? 'audio/mp4' 
           : 'audio/ogg';
 
-      const mediaRecorder = new NewMediaRecorder(stream, { mimeType });
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
       setRecordingDuration(0);
@@ -252,10 +253,6 @@ export function Reports({ reports, officers, lang, initialEditId, onAdd, onUpdat
       alert(lang === 'am' ? 'ማይክሮፎን ማግኘት አልተቻለም' : 'Could not access microphone');
     }
   };
-
-  // Helper alias since NewMediaRecorder doesn't exist, we use standard MediaRecorder
-  const NewMediaRecorder = window.MediaRecorder;
-
 
   const stopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
@@ -484,20 +481,20 @@ export function Reports({ reports, officers, lang, initialEditId, onAdd, onUpdat
                     </select>
                   </div>
 
-                    <div className="bg-brand-bg/50 p-4 rounded-xl border border-brand-border shadow-sm">
-                      <label className="block text-sm font-medium text-brand-text-secondary mb-2">{(t as any).trafficForm.accidentCause || 'Accident Cause'}</label>
-                      <select 
-                        className="input-field"
-                        value={newReport.trafficDetails?.accidentCause}
-                        onChange={(e) => setNewReport({...newReport, trafficDetails: {...newReport.trafficDetails, accidentCause: e.target.value}})}
-                      >
-                        <option value="Other">{(t as any).other || 'Other'}</option>
-                        <option value="Speeding">{lang === 'am' ? 'ከፍጥነት በላይ' : 'Speeding'}</option>
-                        <option value="DrunkDriving">{lang === 'am' ? 'በስካር መንዳት' : 'Drunk Driving'}</option>
-                        <option value="Technical">{lang === 'am' ? 'የቴክኒክ ችግር' : 'Technical Issue'}</option>
-                      </select>
-                    </div>
+                  <div className="bg-brand-bg/50 p-4 rounded-xl border border-brand-border shadow-sm">
+                    <label className="block text-sm font-medium text-brand-text-secondary mb-2">{(t as any).trafficForm.accidentCause || 'Accident Cause'}</label>
+                    <select 
+                      className="input-field"
+                      value={newReport.trafficDetails?.accidentCause}
+                      onChange={(e) => setNewReport({...newReport, trafficDetails: {...newReport.trafficDetails, accidentCause: e.target.value}})}
+                    >
+                      <option value="Other">{(t as any).other || 'Other'}</option>
+                      <option value="Speeding">{lang === 'am' ? 'ከፍጥነት በላይ' : 'Speeding'}</option>
+                      <option value="DrunkDriving">{lang === 'am' ? 'በስካር መንዳት' : 'Drunk Driving'}</option>
+                      <option value="Technical">{lang === 'am' ? 'የቴክኒክ ችግር' : 'Technical Issue'}</option>
+                    </select>
                   </div>
+                </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="bg-brand-bg/50 p-4 rounded-xl border border-brand-border shadow-sm">
@@ -1133,9 +1130,12 @@ export function Reports({ reports, officers, lang, initialEditId, onAdd, onUpdat
                     <ChevronRight size={18} />
                   </button>
                 ) : (
-                  <button type="submit" className="btn-primary flex-1 flex items-center justify-center gap-2">
+                  <button type="submit" className="btn-primary flex-1 flex items-center justify-center gap-2" disabled={isSubmitting}>
                     <Send size={18} />
-                    {editingReport ? t.saveProfile : t.submitReport}
+                    {isSubmitting
+                      ? (lang === 'am' ? 'በመላክ ላይ...' : 'Submitting...')
+                      : (editingReport ? t.saveProfile : t.submitReport)
+                    }
                   </button>
                 )}
               </div>
