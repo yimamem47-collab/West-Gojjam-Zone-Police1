@@ -8,6 +8,11 @@ import { useState } from 'react';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { AIAssistant } from './AIAssistant';
+import { NewsFeed } from './NewsFeed';
+import { MissingPersons } from './MissingPersons';
+import { WantedList } from './WantedList';
+
+import { MissingPerson, WantedPerson, NewsItem, ChatMessage, Assignment, Incident, Report, ZoneReport, User as UserType } from '../types';
 
 interface HomeProps {
   onLogin: () => void;
@@ -21,11 +26,48 @@ interface HomeProps {
   lang: Language;
   setLang: (lang: Language) => void;
   isLoggedIn: boolean;
+  missingPersons: MissingPerson[];
+  wantedPersons: WantedPerson[];
+  newsItems: NewsItem[];
+  chatMessages: ChatMessage[];
+  addChatMessage: (message: Omit<ChatMessage, 'id' | 'userId' | 'timestamp'>) => Promise<string>;
+  updateChatMessage: (id: string, text: string) => Promise<void>;
+  clearChatHistory: () => Promise<void>;
+  assignments: Assignment[];
+  incidents: Incident[];
+  reports: Report[];
+  zoneReports: ZoneReport[];
+  user: UserType | null;
 }
 
-export function Home({ onLogin, onSignup, onReport, onViewContacts, onOpenQR, onCommunityReport, onCorruptionReport, onGoToDashboard, lang, setLang, isLoggedIn }: HomeProps) {
+export function Home({ 
+  onLogin, 
+  onSignup, 
+  onReport, 
+  onViewContacts, 
+  onOpenQR, 
+  onCommunityReport, 
+  onCorruptionReport, 
+  onGoToDashboard, 
+  lang, 
+  setLang, 
+  isLoggedIn,
+  missingPersons,
+  wantedPersons,
+  newsItems,
+  chatMessages,
+  addChatMessage,
+  updateChatMessage,
+  clearChatHistory,
+  assignments,
+  incidents,
+  reports,
+  zoneReports,
+  user
+}: HomeProps) {
   const t = translations[lang];
 
+  const [activePublicTab, setActivePublicTab] = useState<'news' | 'missing' | 'wanted'>('news');
   const [quickTip, setQuickTip] = useState('');
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
@@ -299,6 +341,83 @@ export function Home({ onLogin, onSignup, onReport, onViewContacts, onOpenQR, on
         </div>
       </section>
 
+      {/* Public Board Section (Upfront Citizens Portal) */}
+      <section className="py-12 px-4 bg-gradient-to-b from-brand-card/10 to-brand-card/35 border-t border-b border-brand-border" id="public-board">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-10">
+            <span className="inline-block px-3 py-1 bg-brand-accent/15 border border-brand-accent/25 rounded-full text-brand-accent text-xs font-bold uppercase tracking-wider mb-3 font-mono">
+              {lang === 'am' ? 'የህብረተሰብ መረጃ ሰሌዳ' : 'CITIZENS INFORMATION PORTAL'}
+            </span>
+            <h2 className="text-2xl md:text-4xl font-black tracking-tight mb-3">
+              {lang === 'am' ? 'የክትትልና መረጃ ሰሌዳ' : 'Public Announcement & Watch Board'}
+            </h2>
+            <p className="text-xs md:text-sm text-brand-text-secondary max-w-xl mx-auto leading-relaxed">
+              {lang === 'am' 
+                ? 'ከምዕራብ ጎጃም ዞን ፖሊስ መምሪያ የተለቀቁ ይፋዊ መግለጫዎችን፣ የጠፉ ዜጎችን እና ተፈላጊ ወንጀለኞችን እዚህ በቀጥታ መከታተል ይችላሉ።' 
+                : 'Access public statements, verify active missing persons reports, or explore active suspect listings released by West Gojjam Zone police.'}
+            </p>
+          </div>
+
+          {/* Interactive Navigation Tabs */}
+          <div className="flex flex-wrap items-center justify-center gap-2 mb-8 border-b border-brand-border/60 pb-6">
+            <button
+              onClick={() => setActivePublicTab('news')}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider border transition-all ${
+                activePublicTab === 'news'
+                  ? 'bg-brand-accent border-brand-accent text-brand-bg shadow-lg shadow-brand-accent/20 scale-105'
+                  : 'bg-brand-card border-brand-border text-brand-text-secondary hover:text-white hover:bg-brand-border'
+              }`}
+            >
+              <MessageSquare size={14} />
+              <span>{lang === 'am' ? 'የፖሊስ መግለጫዎች እና ዜና' : 'News & Announcements'}</span>
+            </button>
+
+            <button
+              onClick={() => setActivePublicTab('missing')}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider border transition-all ${
+                activePublicTab === 'missing'
+                  ? 'bg-brand-accent border-brand-accent text-brand-bg shadow-lg shadow-brand-accent/20 scale-105'
+                  : 'bg-brand-card border-brand-border text-brand-text-secondary hover:text-white hover:bg-brand-border'
+              }`}
+            >
+              <Users size={14} />
+              <span>{lang === 'am' ? 'የጠፉ ሰዎች ማህደር' : 'Missing Persons'}</span>
+            </button>
+
+            <button
+              onClick={() => setActivePublicTab('wanted')}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider border transition-all ${
+                activePublicTab === 'wanted'
+                  ? 'bg-brand-accent border-brand-accent text-brand-bg shadow-lg shadow-brand-accent/20 scale-105'
+                  : 'bg-brand-card border-brand-border text-brand-text-secondary hover:text-white hover:bg-brand-border'
+              }`}
+            >
+              <ShieldAlert size={14} />
+              <span>{lang === 'am' ? 'የተፈላጊዎች መዝገብ' : 'Wanted List'}</span>
+            </button>
+          </div>
+
+          {/* Tab Content Areas */}
+          <motion.div
+            key={activePublicTab}
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+            className="p-1 min-h-[400px]"
+          >
+            {activePublicTab === 'news' && (
+              <NewsFeed newsItems={newsItems} lang={lang} readOnly={true} />
+            )}
+            {activePublicTab === 'missing' && (
+              <MissingPersons missingPersons={missingPersons} lang={lang} readOnly={true} />
+            )}
+            {activePublicTab === 'wanted' && (
+              <WantedList wantedPersons={wantedPersons} lang={lang} readOnly={true} />
+            )}
+          </motion.div>
+        </div>
+      </section>
+
       {/* Public Services Section */}
       <section className="py-6 md:py-8 px-4 bg-brand-card/20 border-b border-brand-border">
         <div className="max-w-7xl mx-auto">
@@ -398,97 +517,25 @@ export function Home({ onLogin, onSignup, onReport, onViewContacts, onOpenQR, on
 
             {/* AI Assistant */}
             <div className="glass-card p-2 md:p-4 border-brand-accent/20 flex flex-col h-full">
-              <AIAssistant lang={lang} compact={true} />
+              <AIAssistant 
+                lang={lang} 
+                compact={true} 
+                chatMessages={chatMessages}
+                addChatMessage={addChatMessage}
+                updateChatMessage={updateChatMessage}
+                clearChatHistory={clearChatHistory}
+                assignments={assignments}
+                incidents={incidents}
+                reports={reports}
+                zoneReports={zoneReports}
+                user={user}
+              />
             </div>
           </div>
         </div>
       </section>
 
-      {/* Officer Portal Section - Separated Login and Registration */}
-      <section className="py-8 md:py-16 px-4 bg-brand-card/30 border-t border-brand-border">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-10">
-            <div className="w-12 h-12 bg-brand-accent/10 rounded-xl flex items-center justify-center mx-auto mb-4 border border-brand-accent/30 shadow-inner">
-              <Users size={24} className="text-brand-accent" />
-            </div>
-            <h2 className="text-2xl md:text-3xl font-bold mb-3">
-              {isLoggedIn ? (lang === 'am' ? 'የኦፊሰሮች መግቢያ' : 'Officer Workspace') : (lang === 'am' ? 'የፖሊስ ኦፊሰሮች መግቢያ' : 'Police Officers Entrance')}
-            </h2>
-            <p className="text-xs md:text-sm text-brand-text-secondary max-w-lg mx-auto leading-relaxed">
-              {lang === 'am' 
-                ? 'ይህ ክፍል ለተፈቀደላቸው የፖሊስ አባላት ብቻ የተዘጋጀ ነው። ኦፊሰሮች ወደ ስርዓቱ ለመግባት ወይም ለመመዝገብ ከታች ያሉትን ቁልፎች ይጠቀሙ።'
-                : 'This section is reserved for authorized police personnel. Use the sections below to access your account or register as a new officer.'}
-            </p>
-          </div>
 
-          {isLoggedIn ? (
-            <div className="max-w-md mx-auto">
-              <motion.div 
-                whileHover={{ y: -5 }}
-                className="glass-card p-8 border-brand-accent/30 text-center"
-              >
-                <LayoutDashboard size={48} className="text-brand-accent mx-auto mb-4" />
-                <h3 className="text-xl font-bold mb-2">{lang === 'am' ? 'ወደ ዳሽቦርድ ይሂዱ' : 'Go to Dashboard'}</h3>
-                <p className="text-xs text-brand-text-secondary mb-6">
-                  {lang === 'am' ? 'ወደ ኦፊሴላዊው የአመራር ስርዓት በመመለስዎ ደስተኞች ነን። ስራዎን ለመቀጠል ዳሽቦርዱን ይክፈቱ።' : 'Welcome back! Open your personal dashboard to continue your official duties.'}
-                </p>
-                <button 
-                  onClick={onGoToDashboard}
-                  className="btn-primary w-full py-4 text-sm shadow-xl shadow-brand-accent/30"
-                >
-                  {t.goToDashboard}
-                </button>
-              </motion.div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-              {/* Login Card */}
-              <motion.div 
-                whileHover={{ scale: 1.02 }}
-                className="glass-card p-8 border-brand-accent/20 flex flex-col items-center text-center group"
-              >
-                <div className="p-4 bg-brand-accent/5 rounded-2xl mb-6 group-hover:bg-brand-accent/10 transition-colors">
-                  <Shield size={40} className="text-brand-accent" />
-                </div>
-                <h3 className="text-xl font-bold mb-3">{t.officerLogin}</h3>
-                <p className="text-xs text-brand-text-secondary mb-6 flex-1">
-                  {lang === 'am' 
-                    ? 'አካውንት ካለዎት መለያዎን ተጠቅመው ይግቡ።' 
-                    : 'If you already have an account, sign in to access your dashboard.'}
-                </p>
-                <button 
-                  onClick={onLogin}
-                  className="w-full py-4 rounded-xl border-2 border-brand-accent hover:bg-brand-accent hover:text-brand-bg transition-all font-bold text-sm"
-                >
-                  {t.officerLogin}
-                </button>
-              </motion.div>
-
-              {/* Registration Card */}
-              <motion.div 
-                whileHover={{ scale: 1.02 }}
-                className="glass-card p-8 border-brand-accent/20 flex flex-col items-center text-center group"
-              >
-                <div className="p-4 bg-emerald-500/5 rounded-2xl mb-6 group-hover:bg-emerald-500/10 transition-colors">
-                  <CheckCircle size={40} className="text-emerald-500" />
-                </div>
-                <h3 className="text-xl font-bold mb-3">{t.officerRegister}</h3>
-                <p className="text-xs text-brand-text-secondary mb-6 flex-1">
-                  {lang === 'am' 
-                    ? 'አዲስ የፖሊስ አባል ከሆኑ እዚህ ይመዝገቡ። ምዝገባው በሚመለከተው ክፍል መረጋገጥ አለበት።' 
-                    : 'New to the force? Register here. Your account will require official verification.'}
-                </p>
-                <button 
-                  onClick={onSignup}
-                  className="w-full btn-primary py-4 text-sm shadow-xl shadow-brand-accent/20"
-                >
-                  {t.officerRegister}
-                </button>
-              </motion.div>
-            </div>
-          )}
-        </div>
-      </section>
 
       {/* Footer */}
       <footer className="w-full text-center py-8 px-4 bg-brand-bg border-t border-brand-border mt-auto">

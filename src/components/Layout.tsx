@@ -19,7 +19,9 @@ import {
   Send,
   Activity,
   Car,
-  MapPin
+  MapPin,
+  Newspaper,
+  UserMinus
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Language, translations } from '../lib/translations';
@@ -80,6 +82,9 @@ export function Layout({ children, activeTab, setActiveTab, onBack, onLogout, us
     { id: 'home-view', label: lang === 'am' ? 'መነሻ ገጽ' : 'Home Page', icon: Globe },
     { id: 'dashboard', label: t.dashboard, icon: LayoutDashboard },
     { id: 'traffic-safety', label: lang === 'am' ? 'የትራፊክ ደህንነት' : 'Traffic Safety', icon: Car },
+    { id: 'missing-persons', label: lang === 'am' ? 'የጠፉ ሰዎች' : 'Missing Persons', icon: UserMinus },
+    { id: 'wanted-list', label: lang === 'am' ? 'የተፈላጊዎች አስተዳደር' : 'Wanted List', icon: Shield },
+    { id: 'news-feed', label: lang === 'am' ? 'የዜና ክፍል' : 'News Feed', icon: Newspaper },
     { id: 'map', label: lang === 'am' ? 'የክስተቶች ካርታ' : 'Incident Map', icon: MapPin },
     { id: 'incidents', label: t.crime || 'Crime', icon: AlertTriangle },
     ...(userRole === 'Admin' ? [{ id: 'officers', label: t.officers || 'Officers', icon: Users }] : []),

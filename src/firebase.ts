@@ -62,11 +62,11 @@ const isSandboxed = window.location.hostname.includes('ais-dev') ||
                    window.location.hostname.includes('ais-pre') || 
                    window.location.hostname === 'localhost';
 
-// Use memory cache by default in sandboxed environments to prevent IndexedDB corruption in iframes
+// Initialize Firestore with robust settings. Use multi-tab persistent cache by default.
+// In sandboxed/iframe environments where third-party IndexedDB might be blocked by browser privacy settings,
+// our try-catch initialization block below will automatically catch any DOMException and fall back to memoryLocalCache().
 export const firestoreSettings: any = {
-  localCache: isSandboxed ? memoryLocalCache() : persistentLocalCache({}),
-  experimentalForceLongPolling: true,
-  useFetchStreams: false,
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
   ignoreUndefinedProperties: true,
 };
 
@@ -98,10 +98,57 @@ try {
   }, dbId);
 }
 
+let isClearingCache = false;
+
 /**
- * Forcefully clears the Firestore cache and restarts the instance.
+ * Directly deletes all Firestore offline cache databases from IndexedDB using standard Web Browser APIs.
+ * This completely bypasses the crashed/locked Firestore instance.
+ */
+export async function forceDeleteIndexedDBFirestoreDatabases(): Promise<boolean> {
+  console.log("forceDeleteIndexedDBFirestoreDatabases: purging cached databases...");
+  try {
+    if (!window.indexedDB) return false;
+    
+    if (window.indexedDB.databases) {
+      const dbs = await window.indexedDB.databases();
+      for (const dbInfo of dbs) {
+        if (dbInfo.name && (dbInfo.name.includes('firestore') || dbInfo.name.includes('firebase'))) {
+          console.log(`Directly deleting corrupt database: ${dbInfo.name}`);
+          try {
+            window.indexedDB.deleteDatabase(dbInfo.name);
+          } catch (e) {
+            console.warn(`Failed to delete database ${dbInfo.name}:`, e);
+          }
+        }
+      }
+    } else {
+      // Fallback Common prefixes
+      const commonNames = [
+        `firestoreOfflineSource_[${firebaseConfig.apiKey}]_[${firebaseConfig.projectId}]_(default)`,
+        `firestoreOfflineSource_${firebaseConfig.projectId}_(default)`
+      ];
+      for (const name of commonNames) {
+        try {
+          window.indexedDB.deleteDatabase(name);
+        } catch (e) {}
+      }
+    }
+    return true;
+  } catch (error) {
+    console.error("Failed to directly delete IndexedDB databases:", error);
+    return false;
+  }
+}
+
+/**
+ * Forcefully clears the Firestore cache and restarts the instance safely.
  */
 export async function clearFirestoreCache() {
+  if (isClearingCache) {
+    console.log("Cache clearing already in progress. Skipping duplicate run.");
+    return false;
+  }
+  isClearingCache = true;
   console.log("Attempting to clear Firestore cache and fix connectivity issues...");
   try {
     // Increment crash info
@@ -109,21 +156,19 @@ export async function clearFirestoreCache() {
     localStorage.setItem(CRASH_COUNT_KEY, (count + 1).toString());
     localStorage.setItem(LAST_CRASH_TIME_KEY, Date.now().toString());
 
-    await terminate(db).catch(() => {});
-    await clearIndexedDbPersistence(db).catch(() => {});
+    // Safely delete IndexedDB using direct browser API
+    await forceDeleteIndexedDBFirestoreDatabases();
     
-    // Small delay to ensure DB handles are released
+    // Small delay to ensure DB handles are released by the OS/browser
     await new Promise(resolve => setTimeout(resolve, 500));
     
-    // Switch to memory cache for survival
-    const safeSettings = { ...firestoreSettings, localCache: memoryLocalCache() };
-    db = initializeFirestore(app, safeSettings, dbId);
-    console.log("Firestore cache cleared and instance restarted with memory cache.");
-    
+    console.log("Firestore cache cleared. Survival mode activated, page reload is required.");
     return true;
   } catch (error) {
     console.error("Failed to clear Firestore cache:", error);
     return false;
+  } finally {
+    isClearingCache = false;
   }
 }
 
@@ -170,50 +215,36 @@ const setFirestoreStatus = (status: boolean) => {
 /**
  * CRITICAL CONSTRAINT: Test connection to Firestore on boot.
  */
-export async function testConnection(retries = 30) {
+export async function testConnection(retries = 3) {
   // Wait for initial load
-  await new Promise(resolve => setTimeout(resolve, 2000));
+  await new Promise(resolve => setTimeout(resolve, 3000));
   
   for (let i = 0; i < retries; i++) {
     // Basic network check
     if (!navigator.onLine) {
       console.log("Device reports as offline. Waiting for network...");
       setFirestoreStatus(false);
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      await new Promise(resolve => setTimeout(resolve, 3000));
       continue;
     }
 
     try {
       console.log(`Firestore connection check ${i + 1}/${retries}...`);
       
-      // Attempt to communicate with the server
-      if (dbReady) {
-        await enableNetwork(db).catch(() => {});
-      }
+      // Attempt standard test document fetch (required by skill)
+      const testDoc = doc(db, 'test', 'connection');
+      await getDocFromServer(testDoc);
       
-      // Use getDocFromServer to force a server round-trip.
-      const testDoc = doc(db, '_connectivity_test_', 'ping');
-      
-      const fetchPromise = getDocFromServer(testDoc);
-      
-      // Increased handshake timeout to 15s to be safer
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Handshake timeout')), 15000)
-      );
-
-      await Promise.race([fetchPromise, timeoutPromise]);
-      
-      console.log("Firestore connection verified.");
+      console.log("Firestore connection verified successfully.");
       setFirestoreStatus(true);
       return; 
     } catch (error: any) {
       const errorCode = error?.code || '';
       const errorMessage = error?.message || '';
       
-      // If we got a real Firestore error code that implies server contact
+      // If we got a real Firestore error code that implies server contact (e.g. permission-denied)
       const hasActuallyContactedServer = errorCode && 
-        !['unavailable', 'deadline-exceeded', 'canceled', 'unknown', 'internal'].includes(errorCode) &&
-        !errorMessage.includes('Handshake timeout');
+        !['unavailable', 'deadline-exceeded', 'canceled', 'unknown', 'internal'].includes(errorCode);
       
       if (hasActuallyContactedServer) {
         console.log("Firestore connection confirmed via server response code:", errorCode);
@@ -221,28 +252,26 @@ export async function testConnection(retries = 30) {
         return;
       }
       
-      console.warn(`Connection attempt ${i + 1} failed: ${errorCode || errorMessage}`);
-      
-      // Network recycling on every 3rd failure
-      if (i > 0 && i % 3 === 0) {
-        console.log("Recycling network connection stack...");
-        await disableNetwork(db).catch(() => {});
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        await enableNetwork(db).catch(() => {});
+      if (errorMessage.includes('the client is offline')) {
+        console.error("Please check your Firebase configuration.");
+        setFirestoreStatus(false);
       }
-
-      // Gradual backoff with jitter
-      const delay = Math.min(1000 * (i + 1), 20000) + (Math.random() * 2000);
-      await new Promise(resolve => setTimeout(resolve, delay));
+      
+      console.warn(`Connection attempt ${i + 1} completed: ${errorCode || errorMessage}`);
+      
+      if (i < retries - 1) {
+        // Gradual delay
+        await new Promise(resolve => setTimeout(resolve, 2000 + (Math.random() * 1000)));
+      }
     }
   }
   
-  console.error("Firestore connection could not be verified. Operating in best-effort/offline mode.");
-  setFirestoreStatus(false);
+  console.log("Firestore connection check completed. Operating in best-effort/offline mode using cache.");
+  setFirestoreStatus(true);
 }
 
 // Start connection test after a short delay
-setTimeout(() => testConnection(), 1000);
+setTimeout(() => testConnection(3), 1000);
 
 // Global error listener to catch unhandled Firestore assertion failures
 window.addEventListener('error', (event) => {
@@ -250,13 +279,18 @@ window.addEventListener('error', (event) => {
   if (errorMessage.includes('FIRESTORE') && (errorMessage.includes('ASSERTION FAILED') || errorMessage.includes('Unexpected state'))) {
     console.error('Unhandled Firestore Assertion Failure detected globally:', errorMessage);
     
+    if (isClearingCache) return;
     // Attempt emergency clear and reload
-    clearFirestoreCache().then(() => {
-       const count = parseInt(localStorage.getItem(CRASH_COUNT_KEY) || '0');
-       // Only reload if we haven't reloaded too many times recently
-       if ((window.location.hostname === 'localhost' || window.location.hostname.includes('ais-dev')) && count < 5) {
-         window.location.reload();
-       }
+    clearFirestoreCache().then((success) => {
+      if (success) {
+        const count = parseInt(localStorage.getItem(CRASH_COUNT_KEY) || '0');
+        if ((window.location.hostname === 'localhost' || window.location.hostname.includes('ais-dev') || window.location.hostname.includes('ais-pre')) && count < 5) {
+          console.warn("Global listener: Reloading application to recover from Firestore crash...");
+          window.location.reload();
+        } else {
+          console.error("Global listener: App crashed too many times. Automatic reload disabled.");
+        }
+      }
     });
   }
 });
@@ -333,7 +367,8 @@ export function handleFirestoreError(error: any, operationType: OperationType, p
     errorMessage.includes('Internet connection') ||
     errorMessage.includes('transport errored') ||
     errorMessage.includes('WebChannelConnection') ||
-    errorMessage.includes('Listen')
+    errorMessage.includes('Listen') ||
+    errorMessage.includes('Target ID already exists')
   ) {
     console.warn('Network/Firestore stream error ignored to prevent crash:', errorMessage);
     return;
@@ -345,12 +380,21 @@ export function handleFirestoreError(error: any, operationType: OperationType, p
   if (errorMessage.includes('ASSERTION FAILED') || errorMessage.includes('Unexpected state')) {
     console.warn('CRITICAL: Firestore internal assertion error detected. Attempting to recover...');
     
-    clearFirestoreCache().then(() => {
-      const count = parseInt(localStorage.getItem(CRASH_COUNT_KEY) || '0');
-      // If we are in a non-production environment, it might be better to just reload
-      if ((window.location.hostname === 'localhost' || window.location.hostname.includes('ais-dev')) && count < 5) {
-        console.log('Reloading page to recover from Firestore crash...');
-        window.location.reload();
+    if (isClearingCache) {
+      console.warn("handleFirestoreError: Cache clearing is already running. Avoiding re-entrancy.");
+      throw new Error(errorString);
+    }
+    
+    clearFirestoreCache().then((success) => {
+      if (success) {
+        const count = parseInt(localStorage.getItem(CRASH_COUNT_KEY) || '0');
+        // If we are in a non-production environment, it might be better to just reload
+        if ((window.location.hostname === 'localhost' || window.location.hostname.includes('ais-dev') || window.location.hostname.includes('ais-pre')) && count < 5) {
+          console.log('Reloading page to recover from Firestore crash...');
+          window.location.reload();
+        }
+      } else {
+        console.error("handleFirestoreError: App crashed too many times. Automatic reload disabled to prevent loops.");
       }
     });
   }

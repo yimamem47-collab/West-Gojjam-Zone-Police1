@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
 import { Language, translations } from '../lib/translations';
 import { getGeminiResponse, getGeminiResponseStream, getGeminiTTS } from '../services/geminiService';
-import { useAppData } from '../hooks/useAppData';
+import { ChatMessage, Assignment, Incident, Report, ZoneReport, User as UserType } from '../types';
 
 interface Message {
   id: string;
@@ -16,11 +16,31 @@ interface Message {
 interface AIAssistantProps {
   lang: Language;
   compact?: boolean;
+  chatMessages: ChatMessage[];
+  addChatMessage: (message: Omit<ChatMessage, 'id' | 'userId' | 'timestamp'>) => Promise<string>;
+  updateChatMessage: (id: string, text: string) => Promise<void>;
+  clearChatHistory: () => Promise<void>;
+  assignments: Assignment[];
+  incidents: Incident[];
+  reports: Report[];
+  zoneReports: ZoneReport[];
+  user: UserType | null;
 }
 
-export function AIAssistant({ lang, compact = false }: AIAssistantProps) {
+export function AIAssistant({ 
+  lang, 
+  compact = false,
+  chatMessages,
+  addChatMessage,
+  updateChatMessage,
+  clearChatHistory,
+  assignments,
+  incidents,
+  reports,
+  zoneReports,
+  user
+}: AIAssistantProps) {
   const t = translations[lang];
-  const { chatMessages, addChatMessage, updateChatMessage, clearChatHistory, assignments, incidents, reports, zoneReports, user } = useAppData();
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Incident, Officer, Assignment, Report, User, ZoneReport, ChatMessage } from '../types';
+import { Incident, Officer, Assignment, Report, User, ZoneReport, ChatMessage, MissingPerson, WantedPerson, NewsItem } from '../types';
 import { INITIAL_OFFICERS, INITIAL_INCIDENTS, INITIAL_ASSIGNMENTS, INITIAL_REPORTS } from '../constants';
 import { db, handleFirestoreError, OperationType, CRIME_REPORTS_COLLECTION } from '../firebase';
 import { formatFirestoreTimestamp } from '../lib/utils';
@@ -24,6 +24,9 @@ export function useAppData() {
   const [reports, setReports] = useState<Report[]>([]);
   const [zoneReports, setZoneReports] = useState<ZoneReport[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [missingPersons, setMissingPersons] = useState<MissingPerson[]>([]);
+  const [wantedPersons, setWantedPersons] = useState<WantedPerson[]>([]);
+  const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
   const [user, setUser] = useState<User | null>(null);
 
   // Sync with Firestore
@@ -156,6 +159,60 @@ export function useAppData() {
       unsubChatMessages();
     };
   }, [user]);
+
+  // Sync Public Collections unconditionally on component mount
+  useEffect(() => {
+    // Missing Persons query
+    const missingPersonsQuery = collection(db, 'missing_persons');
+    const unsubMissingPersons = onSnapshot(missingPersonsQuery, (snapshot) => {
+      const data = snapshot.docs.map(doc => {
+        const d = doc.data();
+        return {
+          ...d,
+          timestamp: formatFirestoreTimestamp(d.timestamp)
+        } as MissingPerson;
+      });
+      setMissingPersons(data);
+    }, (err) => {
+      handleFirestoreError(err, OperationType.LIST, 'missing_persons');
+    });
+
+    // Wanted Suspects query
+    const wantedPersonsQuery = collection(db, 'wanted_persons');
+    const unsubWantedPersons = onSnapshot(wantedPersonsQuery, (snapshot) => {
+      const data = snapshot.docs.map(doc => {
+        const d = doc.data();
+        return {
+          ...d,
+          timestamp: formatFirestoreTimestamp(d.timestamp)
+        } as WantedPerson;
+      });
+      setWantedPersons(data);
+    }, (err) => {
+      handleFirestoreError(err, OperationType.LIST, 'wanted_persons');
+    });
+
+    // News Items query
+    const newsItemsQuery = collection(db, 'police_news');
+    const unsubNewsItems = onSnapshot(newsItemsQuery, (snapshot) => {
+      const data = snapshot.docs.map(doc => {
+        const d = doc.data();
+        return {
+          ...d,
+          timestamp: formatFirestoreTimestamp(d.timestamp)
+        } as NewsItem;
+      });
+      setNewsItems(data);
+    }, (err) => {
+      handleFirestoreError(err, OperationType.LIST, 'police_news');
+    });
+
+    return () => {
+      unsubMissingPersons();
+      unsubWantedPersons();
+      unsubNewsItems();
+    };
+  }, []);
 
   const addOfficer = async (officer: Omit<Officer, 'id'>) => {
     const officerRef = doc(collection(db, 'officers'));
@@ -377,6 +434,117 @@ export function useAppData() {
     }
   };
 
+  const addMissingPerson = async (person: Omit<MissingPerson, 'id'>) => {
+    const docRef = doc(collection(db, 'missing_persons'));
+    const id = docRef.id;
+    const item = cleanForCreate({
+      ...person,
+      id,
+      timestamp: serverTimestamp()
+    });
+    try {
+      await setDoc(docRef, item);
+      await sendTelegramMessage(`⚠️ <b>የጠፋ ሰው ምዝገባ (New Missing Person)</b>\n---------------------------\n<b>ስም:</b> ${escapeHtml(item.name)}\n<b>እድሜ:</b> ${escapeHtml(String(item.age))}\n<b>ጾታ:</b> ${escapeHtml(item.gender)}\n<b>መጨረሻ የታየው:</b> ${escapeHtml(item.lastSeenLocation)}\n<b>ስልክ:</b> ${escapeHtml(item.contactPhone)}`);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.CREATE, `missing_persons/${id}`);
+    }
+  };
+
+  const updateMissingPerson = async (id: string, updates: Partial<MissingPerson>) => {
+    try {
+      await updateDoc(doc(db, 'missing_persons', id), {
+        ...cleanForUpdate(updates),
+        timestamp: serverTimestamp()
+      });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `missing_persons/${id}`);
+    }
+  };
+
+  const deleteMissingPerson = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'missing_persons', id));
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `missing_persons/${id}`);
+    }
+  };
+
+  const addWantedPerson = async (person: Omit<WantedPerson, 'id'>) => {
+    const docRef = doc(collection(db, 'wanted_persons'));
+    const id = docRef.id;
+    const item = cleanForCreate({
+      ...person,
+      id,
+      timestamp: serverTimestamp()
+    });
+    try {
+      await setDoc(docRef, item);
+      await sendTelegramMessage(`🚨 <b>አዲስ ተፈላጊ (New Wanted Suspect)</b>\n---------------------------\n<b>ስም:</b> ${escapeHtml(item.name)}\n<b>ቅጽል ስም:</b> ${escapeHtml(item.alias || '---')}\n<b>ወንጀል:</b> ${escapeHtml(item.crimeCommitted)}\n<b>መጨረሻ የታየው:</b> ${escapeHtml(item.lastKnownLocation || '---')}\n<b>ሽልማት:</b> ${escapeHtml(item.reward || '---')}`);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.CREATE, `wanted_persons/${id}`);
+    }
+  };
+
+  const updateWantedPerson = async (id: string, updates: Partial<WantedPerson>) => {
+    try {
+      await updateDoc(doc(db, 'wanted_persons', id), {
+        ...cleanForUpdate(updates),
+        timestamp: serverTimestamp()
+      });
+      if (updates.status === 'Captured') {
+        const p = wantedPersons.find(wp => wp.id === id);
+        if (p) {
+          await sendTelegramMessage(`✅ <b>ተፈላጊው ተይዟል! (Suspect Captured)</b>\n---------------------------\n<b>ስም:</b> ${escapeHtml(p.name)}\n<b>ወንጀል:</b> ${escapeHtml(p.crimeCommitted)}\nተፈላጊው በቁጥጥር ስር ውሏል።`);
+        }
+      }
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `wanted_persons/${id}`);
+    }
+  };
+
+  const deleteWantedPerson = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'wanted_persons', id));
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `wanted_persons/${id}`);
+    }
+  };
+
+  const addNewsItem = async (news: Omit<NewsItem, 'id'>) => {
+    const docRef = doc(collection(db, 'police_news'));
+    const id = docRef.id;
+    const item = cleanForCreate({
+      ...news,
+      id,
+      timestamp: serverTimestamp()
+    });
+    try {
+      await setDoc(docRef, item);
+      await sendTelegramMessage(`📢 <b>ይፋዊ መግለጫ (Official Police Release)</b>\n---------------------------\n<b>ርዕስ:</b> ${escapeHtml(item.title)}\n<b>ዓይነት:</b> ${escapeHtml(item.category)}\n<b>ጸሐፊ:</b> ${escapeHtml(item.author)}`);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.CREATE, `police_news/${id}`);
+    }
+  };
+
+  const updateNewsItem = async (id: string, updates: Partial<NewsItem>) => {
+    try {
+      await updateDoc(doc(db, 'police_news', id), {
+        ...cleanForUpdate(updates),
+        timestamp: serverTimestamp()
+      });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, `police_news/${id}`);
+    }
+  };
+
+  const deleteNewsItem = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'police_news', id));
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, `police_news/${id}`);
+    }
+  };
+
   const addChatMessage = async (message: Omit<ChatMessage, 'id' | 'userId' | 'timestamp'>) => {
     if (!user) return '';
     const docRef = doc(collection(db, 'chat_messages'));
@@ -433,11 +601,15 @@ export function useAppData() {
 
   return {
     officers, incidents, assignments, reports, zoneReports, chatMessages, user,
+    missingPersons, wantedPersons, newsItems,
     addOfficer, updateOfficer, deleteOfficer,
     addIncident, updateIncident, deleteIncident,
     addAssignment, updateAssignment, deleteAssignment,
     addReport, updateReport, deleteReport,
     addZoneReport, addChatMessage, updateChatMessage, clearChatHistory,
+    addMissingPerson, updateMissingPerson, deleteMissingPerson,
+    addWantedPerson, updateWantedPerson, deleteWantedPerson,
+    addNewsItem, updateNewsItem, deleteNewsItem,
     login, logout, setUser
   };
 }

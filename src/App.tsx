@@ -24,6 +24,9 @@ import ZoneReports from './components/ZoneReports';
 import { IncidentMap } from './components/IncidentMap';
 import { AIAssistant } from './components/AIAssistant';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { MissingPersons } from './components/MissingPersons';
+import { WantedList } from './components/WantedList';
+import { NewsFeed } from './components/NewsFeed';
 import { Language, translations } from './lib/translations';
 import { Phone, Loader2, CheckCircle, ArrowUp, Bot, X, Shield } from 'lucide-react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
@@ -125,12 +128,17 @@ export default function App() {
   
   const {
     officers, incidents, assignments, reports, zoneReports, user,
+    missingPersons, wantedPersons, newsItems,
     addOfficer, updateOfficer, deleteOfficer,
     addIncident, updateIncident, deleteIncident,
     addAssignment, updateAssignment, deleteAssignment,
     addReport, updateReport, deleteReport,
     addZoneReport,
-    login, logout, setUser
+    addMissingPerson, updateMissingPerson, deleteMissingPerson,
+    addWantedPerson, updateWantedPerson, deleteWantedPerson,
+    addNewsItem, updateNewsItem, deleteNewsItem,
+    login, logout, setUser,
+    chatMessages, addChatMessage, updateChatMessage, clearChatHistory
   } = useAppData();
 
   const t = translations[lang];
@@ -462,7 +470,7 @@ export default function App() {
             lang={lang} 
           />
         );
-      case 'zone-reports':
+       case 'zone-reports':
         return (
           <ZoneReports
             reports={zoneReports}
@@ -470,6 +478,37 @@ export default function App() {
             onAddReport={addZoneReport}
             language={lang}
             currentUser={user}
+          />
+        );
+      case 'missing-persons':
+        return (
+          <MissingPersons
+            missingPersons={missingPersons}
+            lang={lang}
+            onAdd={addMissingPerson}
+            onUpdate={updateMissingPerson}
+            onDelete={deleteMissingPerson}
+          />
+        );
+      case 'wanted-list':
+        return (
+          <WantedList
+            wantedPersons={wantedPersons}
+            lang={lang}
+            onAdd={addWantedPerson}
+            onUpdate={updateWantedPerson}
+            onDelete={deleteWantedPerson}
+          />
+        );
+      case 'news-feed':
+        return (
+          <NewsFeed
+            newsItems={newsItems}
+            userRole={user?.role}
+            lang={lang}
+            onAdd={addNewsItem}
+            onUpdate={updateNewsItem}
+            onDelete={deleteNewsItem}
           />
         );
       case 'community-reports':
@@ -497,7 +536,20 @@ export default function App() {
       case 'help':
         return <AppManual lang={lang} />;
       case 'ai-assistant':
-        return <AIAssistant lang={lang} />;
+        return (
+          <AIAssistant 
+            lang={lang} 
+            chatMessages={chatMessages}
+            addChatMessage={addChatMessage}
+            updateChatMessage={updateChatMessage}
+            clearChatHistory={clearChatHistory}
+            assignments={assignments}
+            incidents={incidents}
+            reports={reports}
+            zoneReports={zoneReports}
+            user={user}
+          />
+        );
       case 'contacts':
         return <EmergencyContacts lang={lang} onBack={() => setView('home')} />;
       default:
@@ -626,6 +678,18 @@ export default function App() {
           lang={lang} 
           setLang={setLang} 
           isLoggedIn={!!user}
+          missingPersons={missingPersons}
+          wantedPersons={wantedPersons}
+          newsItems={newsItems}
+          chatMessages={chatMessages}
+          addChatMessage={addChatMessage}
+          updateChatMessage={updateChatMessage}
+          clearChatHistory={clearChatHistory}
+          assignments={assignments}
+          incidents={incidents}
+          reports={reports}
+          zoneReports={zoneReports}
+          user={user}
         />
         {citizenReportType && (
           <CitizenReport 
@@ -819,7 +883,19 @@ export default function App() {
                 </button>
               </div>
               <div className="h-[300px] bg-brand-bg">
-                <AIAssistant lang={lang} compact={true} />
+                <AIAssistant 
+                  lang={lang} 
+                  compact={true} 
+                  chatMessages={chatMessages}
+                  addChatMessage={addChatMessage}
+                  updateChatMessage={updateChatMessage}
+                  clearChatHistory={clearChatHistory}
+                  assignments={assignments}
+                  incidents={incidents}
+                  reports={reports}
+                  zoneReports={zoneReports}
+                  user={user}
+                />
               </div>
             </motion.div>
           )}

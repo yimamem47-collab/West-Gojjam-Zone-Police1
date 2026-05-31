@@ -23,7 +23,11 @@ import {
   Map as MapIcon,
   Car,
   Globe,
-  Settings
+  Settings,
+  RefreshCw,
+  Loader2,
+  Check,
+  Activity
 } from 'lucide-react';
 import { 
   XAxis, 
@@ -34,7 +38,7 @@ import {
   AreaChart,
   Area
 } from 'recharts';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Incident, Officer, Assignment, Report, ZoneReport, User } from '../types';
 import { Language, translations } from '../lib/translations';
 import { openUrl, dialPhone } from '../lib/utils';
@@ -115,6 +119,68 @@ export function Dashboard({
   const [dashboardSearch, setDashboardSearch] = React.useState('');
   const [deleteConfirm, setDeleteConfirm] = React.useState<{ id: string; type: string } | null>(null);
   const [isSyncing, setIsSyncing] = React.useState(false);
+
+  // GitHub & Connectivity Diagnostics on Dashboard
+  const [isSyncingGitHub, setIsSyncingGitHub] = React.useState(false);
+  const [githubSyncResults, setGithubSyncResults] = React.useState<any[]>([]);
+  const [showGithubDetails, setShowGithubDetails] = React.useState(false);
+  const [isTestingDiagnostics, setIsTestingDiagnostics] = React.useState(false);
+  const [diagnosticResults, setDiagnosticResults] = React.useState<{service: string; ok: boolean; message: string}[]>([]);
+
+  const handleGitHubSync = async () => {
+    if (!window.confirm(lang === 'am' ? 'ይህ የቅርብ ጊዜውን ዳሽቦርድ ኮድ በቀጥታ ወደ GitHub ሪፖዚቶሪ (yimamem47-collab/west-gojjame-police) ያመሳስለዋል። ለመቀጠል እርግጠኛ ነዎት?' : 'This will sync the latest dashboard code directly to your GitHub repository (yimamem47-collab/west-gojjame-police). Continue?')) return;
+    
+    setIsSyncingGitHub(true);
+    setGithubSyncResults([]);
+    setShowGithubDetails(true);
+    
+    try {
+      const response = await fetch('/api/github/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Server sync failed');
+      }
+
+      const data = await response.json();
+      setGithubSyncResults(data.results || []);
+      
+      const successCount = (data.results || []).filter((r: any) => r.status === 'success').length;
+      if (successCount === (data.results || []).length) {
+        alert(lang === 'am' ? 'ሁሉም የኮድ ፋይሎች ወደ GitHub ተሳክቶላቸዋል!' : 'All files synced successfully to GitHub! You can pull the latest code in Android Studio.');
+      } else {
+        alert(lang === 'am' ? `ማመሳሰል በከፊል ተሳክቷል። ከ ${data.results.length} ውስጥ ${successCount} ፋይሎች ተመሳስለዋል።` : `Sync partially successful. ${successCount} of ${data.results.length} files synced.`);
+      }
+    } catch (e: any) {
+      console.error('GitHub Sync Error:', e);
+      alert(lang === 'am' ? `ማመሳሰል አልተሳካም: ${e.message}` : `Sync failed: ${e.message}`);
+    } finally {
+      setIsSyncingGitHub(false);
+    }
+  };
+
+  const runConnectivityDiagnostics = async () => {
+    setIsTestingDiagnostics(true);
+    setDiagnosticResults([]);
+    try {
+      const { testFirebaseConnection, testTelegramConnection, testGoogleSheetsConnection } = await import('../services/diagnostics');
+      const r1 = await testFirebaseConnection();
+      const r2 = await testTelegramConnection();
+      const r3 = await testGoogleSheetsConnection();
+      setDiagnosticResults([
+        { service: 'Firebase Database', ok: r1.status === 'success', message: r1.message },
+        { service: 'Telegram Alerts Bot', ok: r2.status === 'success', message: r2.message },
+        { service: 'Google Sheets Backup', ok: r3.status === 'success', message: r3.message }
+      ]);
+    } catch (err: any) {
+      console.error("Diagnostics failed:", err);
+    } finally {
+      setIsTestingDiagnostics(false);
+    }
+  };
 
   const handleManualSync = async () => {
     setIsSyncing(true);
@@ -346,6 +412,105 @@ export function Dashboard({
 
         {/* Sidebar Content Column */}
         <div className="lg:col-span-4 space-y-6">
+          {/* System Sync & Diagnostics Control Card */}
+          <div className="glass-card p-6 border-brand-accent/20 bg-brand-accent/[0.02] shadow-xl">
+            <div className="flex items-center gap-2.5 mb-4">
+              <RefreshCw className="text-brand-accent animate-spin-slow" size={20} />
+              <div>
+                <h3 className="text-sm font-black tracking-wider text-white uppercase">{lang === 'am' ? 'የኮድ ማመሳሰያ እና ምርመራ' : 'GitHub Sync & Diagnostics'}</h3>
+                <p className="text-[10px] text-brand-text-secondary">{lang === 'am' ? 'ዳሽቦርዱን ወደ GitHub ማመሳሰያ' : 'Sync dashboard to Github and test connections'}</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {/* GitHub Sync Section */}
+              <div className="bg-brand-bg/40 p-3 rounded-xl border border-brand-border/60">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-[10px] font-black text-white tracking-widest uppercase">{lang === 'am' ? 'የጊትሀብ ኮድ ማመሳሰያ' : 'GITHUB CODE SYNC'}</span>
+                  <span className="text-[9px] text-brand-accent font-medium">yimamem47-collab</span>
+                </div>
+                <button 
+                  onClick={handleGitHubSync}
+                  disabled={isSyncingGitHub}
+                  className={`w-full flex items-center justify-center gap-2 btn-primary py-2 text-xs font-bold transition-all active:scale-[0.98] ${isSyncingGitHub ? 'opacity-50 pointer-events-none' : ''}`}
+                >
+                  {isSyncingGitHub ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                  {isSyncingGitHub ? (lang === 'am' ? 'በማመሳሰል ላይ...' : 'SYNCING TO GITHUB...') : (lang === 'am' ? 'አሁን ኮዱን አመሳስል' : 'SYNC DASHBOARD TO GITHUB')}
+                </button>
+
+                {githubSyncResults.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    <div className="flex justify-between items-center text-[10px] font-bold">
+                      <span className="text-brand-text-secondary">{lang === 'am' ? 'ውጤቶች' : 'Files State'}</span>
+                      <button 
+                        onClick={() => setShowGithubDetails(!showGithubDetails)}
+                        className="text-brand-accent hover:underline"
+                      >
+                        {showGithubDetails ? (lang === 'am' ? 'ዝርዝር ደብቅ' : 'Hide Details') : (lang === 'am' ? 'ዝርዝር አሳይ' : 'Show Details')}
+                      </button>
+                    </div>
+
+                    <div className="w-full bg-slate-800/80 rounded-full h-1.5 overflow-hidden">
+                      <div 
+                        className="bg-brand-accent h-1.5 rounded-full transition-all"
+                        style={{ width: `${(githubSyncResults.filter(r => r.status === 'success').length / githubSyncResults.length) * 100}%` }}
+                      />
+                    </div>
+                    
+                    {showGithubDetails && (
+                      <div className="max-h-32 overflow-y-auto custom-scrollbar space-y-1 bg-black/40 p-2 rounded-lg border border-brand-border text-[9px] font-mono">
+                        {githubSyncResults.map((result: any, i: number) => (
+                          <div key={i} className="flex justify-between items-center">
+                            <span className="text-brand-text-secondary truncate max-w-[150px]">{result.file}</span>
+                            <span className={result.status === 'success' ? 'text-emerald-400' : 'text-rose-400 font-bold'}>
+                              {result.status === 'success' ? 'OK' : 'ERR'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Status Diagnostics Section */}
+              <div className="bg-brand-bg/40 p-3 rounded-xl border border-brand-border/60">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-[10px] font-black text-white tracking-widest uppercase">{lang === 'am' ? 'የሲስተም ትስስሮች ምርመራ' : 'SYSTEM CONNECTIVITY'}</span>
+                  <div className="flex items-center gap-1.5">
+                    <Activity size={12} className={isTestingDiagnostics ? 'text-brand-accent animate-pulse' : 'text-emerald-500'} />
+                  </div>
+                </div>
+
+                <button 
+                  onClick={runConnectivityDiagnostics}
+                  disabled={isTestingDiagnostics}
+                  className={`w-full flex items-center justify-center gap-2 btn-secondary py-2 text-xs font-bold transition-all active:scale-[0.98] ${isTestingDiagnostics ? 'opacity-50' : ''}`}
+                >
+                  {isTestingDiagnostics ? <Loader2 size={14} className="animate-spin" /> : <Activity size={14} />}
+                  {isTestingDiagnostics ? (lang === 'am' ? 'በመመርመር ላይ...' : 'TESTING SYSTEM...') : (lang === 'am' ? 'ትስስሮችን መርምር' : 'RUN CONNECTIVITY DIAGNOSTICS')}
+                </button>
+
+                {diagnosticResults.length > 0 && (
+                  <div className="mt-3 space-y-1.5">
+                    {diagnosticResults.map((res, i) => (
+                      <div key={i} className="flex flex-col gap-0.5 p-2 bg-black/20 rounded-lg border border-brand-border/50 text-[10px]">
+                        <div className="flex justify-between items-center font-bold">
+                          <span className="text-white">{res.service}</span>
+                          <span className={res.ok ? 'text-emerald-400 flex items-center gap-1' : 'text-rose-400 flex items-center gap-1'}>
+                            {res.ok ? <Check size={10} /> : <AlertTriangle size={10} />}
+                            {res.ok ? 'ONLINE' : 'FAILED'}
+                          </span>
+                        </div>
+                        <p className="text-[9px] text-brand-text-secondary font-medium leading-normal">{res.message}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
           {/* Quick Actions */}
           <div className="glass-card p-6">
             <h3 className="text-base font-bold text-white mb-4">{t.quickActions}</h3>

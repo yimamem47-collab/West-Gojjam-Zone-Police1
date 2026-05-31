@@ -128,3 +128,42 @@ export interface ChatMessage {
   timestamp: string;
   userId: string;
 }
+
+export interface MissingPerson {
+  id: string;
+  name: string;
+  age: number | string;
+  gender: string;
+  lastSeenDate: string;
+  lastSeenLocation: string;
+  photo?: string;
+  description: string;
+  contactPhone: string;
+  status: 'Missing' | 'Found';
+  reportedBy: string;
+  timestamp?: string;
+}
+
+export interface WantedPerson {
+  id: string;
+  name: string;
+  alias?: string;
+  crimeCommitted: string;
+  photo?: string;
+  description: string;
+  lastKnownLocation?: string;
+  status: 'Wanted' | 'Captured';
+  reward?: string;
+  timestamp?: string;
+}
+
+export interface NewsItem {
+  id: string;
+  title: string;
+  content: string;
+  date: string;
+  author: string;
+  category: string;
+  photo?: string;
+  timestamp?: string;
+}
