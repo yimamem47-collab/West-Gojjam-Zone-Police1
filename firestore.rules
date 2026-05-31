@@ -227,5 +227,21 @@ service cloud.firestore {
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
+
+    // New Citizens Portal Collections (Open read for public, restricted writes to officers/admins)
+    match /missing_persons/{personId} {
+      allow read: if true;
+      allow write: if isAuthenticated() && (isOfficer() || isAdmin());
+    }
+
+    match /wanted_persons/{personId} {
+      allow read: if true;
+      allow write: if isAuthenticated() && (isOfficer() || isAdmin());
+    }
+
+    match /police_news/{newsId} {
+      allow read: if true;
+      allow write: if isAuthenticated() && (isOfficer() || isAdmin());
+    }
   }
 }
