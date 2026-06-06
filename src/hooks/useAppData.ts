@@ -144,8 +144,16 @@ export function useAppData() {
           timestamp: formatFirestoreTimestamp(d.timestamp)
         } as ChatMessage;
       });
-      // Sort by timestamp
-      setChatMessages(data.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()));
+      // Sort by timestamp, preserving local messages that haven't been written to Firestore yet or are streaming
+      setChatMessages(prev => {
+        const locals = prev.filter(msg => msg.id.startsWith('local_'));
+        const combined = [...data, ...locals];
+        return combined.sort((a, b) => {
+          const timeA = new Date(a.timestamp || 0).getTime();
+          const timeB = new Date(b.timestamp || 0).getTime();
+          return timeA - timeB;
+        });
+      });
     }, (err) => {
       handleFirestoreError(err, OperationType.LIST, 'chat_messages');
     });
@@ -545,18 +553,34 @@ export function useAppData() {
     }
   };
 
-  const addChatMessage = async (message: Omit<ChatMessage, 'id' | 'userId' | 'timestamp'>) => {
-    if (!user) return '';
+  const addChatMessage = async (message: Omit<ChatMessage, 'id' | 'userId' | 'timestamp'>, isLocal = false, replaceLocalId?: string) => {
+    const localId = `local_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const newMessage: ChatMessage = {
+      ...message,
+      id: localId,
+      userId: user ? user.id : 'guest',
+      timestamp: new Date().toISOString()
+    };
+
+    if (replaceLocalId) {
+      setChatMessages(prev => prev.filter(msg => msg.id !== replaceLocalId));
+    }
+
+    if (isLocal || !user) {
+      setChatMessages(prev => [...prev, newMessage]);
+      return localId;
+    }
+
     const docRef = doc(collection(db, 'chat_messages'));
     const id = docRef.id;
-    const newMessage = { 
+    const dbMessage = { 
       ...message, 
       id, 
       userId: user.id,
       timestamp: serverTimestamp() as any
     };
     try {
-      await setDoc(docRef, newMessage);
+      await setDoc(docRef, dbMessage);
       return id;
     } catch (err) {
       handleFirestoreError(err, OperationType.CREATE, `chat_messages/${id}`);
@@ -565,7 +589,10 @@ export function useAppData() {
   };
 
   const updateChatMessage = async (id: string, text: string) => {
-    if (!user) return;
+    if (id.startsWith('local_') || !user) {
+      setChatMessages(prev => prev.map(msg => msg.id === id ? { ...msg, text } : msg));
+      return;
+    }
     try {
       await updateDoc(doc(db, 'chat_messages', id), { text });
     } catch (err) {
@@ -574,7 +601,10 @@ export function useAppData() {
   };
 
   const clearChatHistory = async () => {
-    if (!user) return;
+    if (!user) {
+      setChatMessages([]);
+      return;
+    }
     try {
       // Local clear first for responsiveness
       setChatMessages([]);
@@ -584,7 +614,9 @@ export function useAppData() {
       // and maybe add a flag or just leave it as is if batch delete is too complex.
       // But let's try a simple loop for now if the list is small.
       for (const msg of chatMessages) {
-        await deleteDoc(doc(db, 'chat_messages', msg.id));
+        if (!msg.id.startsWith('local_')) {
+          await deleteDoc(doc(db, 'chat_messages', msg.id));
+        }
       }
     } catch (err) {
       console.error("Clear chat error:", err);

@@ -18,7 +18,7 @@ export function VoiceRecorder({ lang, onRecordingComplete, onDelete, maxDuration
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<any>(null);
 
   useEffect(() => {
     if (isRecording) {

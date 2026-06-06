@@ -17,7 +17,7 @@ interface AIAssistantProps {
   lang: Language;
   compact?: boolean;
   chatMessages: ChatMessage[];
-  addChatMessage: (message: Omit<ChatMessage, 'id' | 'userId' | 'timestamp'>) => Promise<string>;
+  addChatMessage: (message: Omit<ChatMessage, 'id' | 'userId' | 'timestamp'>, isLocal?: boolean, replaceLocalId?: string) => Promise<string>;
   updateChatMessage: (id: string, text: string) => Promise<void>;
   clearChatHistory: () => Promise<void>;
   assignments: Assignment[];
@@ -178,15 +178,6 @@ export function AIAssistant({
     if (e) e.preventDefault();
     if (!input.trim() || loading) return;
 
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      await addChatMessage({
-        text: lang === 'am' ? 'የGemini API ቁልፍ (API Key) አልተገኘም። እባክዎ በቅንብሮች (Settings) ውስጥ ቁልፉን ያስገቡ ወይም VITE_GEMINI_API_KEY ን ይፈትሹ።' : "Gemini API key is missing. Please provide VITE_GEMINI_API_KEY in the environment or Settings menu.",
-        sender: 'ai'
-      });
-      return;
-    }
-
     const userMessageText = input;
 
     await addChatMessage({
@@ -197,12 +188,13 @@ export function AIAssistant({
     setInput('');
     setLoading(true);
 
+    let aiMessageId = '';
     try {
-      // Create a placeholder for the AI response
-      const aiMessageId = await addChatMessage({
+      // Create a local-only placeholder for the AI response
+      aiMessageId = await addChatMessage({
         text: '...',
         sender: 'ai'
-      });
+      }, true);
 
       if (!aiMessageId) throw new Error("Failed to create AI message");
 
@@ -214,11 +206,17 @@ export function AIAssistant({
         })),
         { assignments, incidents, reports, zoneReports, user },
         async (text) => {
-          // Update the message in Firestore as it streams
+          // Update the message locally as it streams
           await updateChatMessage(aiMessageId, text);
         }
       );
       
+      // Once stream is complete, persist final AI message to Firestore, replacing the local placeholder
+      await addChatMessage({
+        text: aiResponse,
+        sender: 'ai'
+      }, false, aiMessageId);
+
       // Auto-speak the final response
       speakText(aiResponse);
     } catch (error) {
@@ -226,7 +224,7 @@ export function AIAssistant({
       await addChatMessage({
         text: lang === 'am' ? 'ይቅርታ፣ ምላሽ መስጠት አልቻልኩም። እባክዎ እንደገና ይሞክሩ።' : "Sorry, I couldn't generate a response. Please try again.",
         sender: 'ai'
-      });
+      }, true, aiMessageId);
     } finally {
       setLoading(false);
     }

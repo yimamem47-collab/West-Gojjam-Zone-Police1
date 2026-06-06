@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Plus, Search, Trash2, Download, Edit2, Shield, Mic, Square, ChevronLeft, ChevronRight, Send, CheckCircle, Info, X, Volume2, Camera, File as FileIcon, FileCheck, Image as ImageIcon } from 'lucide-react';
+import { FileText, Plus, Search, Trash2, Download, Edit2, Shield, Mic, Square, ChevronLeft, ChevronRight, Send, CheckCircle, Info, X, Volume2, Camera, File as FileIcon, FileCheck, Image as ImageIcon, AlertCircle } from 'lucide-react';
 import { Report, Officer } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { Language, translations } from '../lib/translations';
@@ -24,6 +24,7 @@ export function Reports({ reports, officers, lang, initialEditId, onAdd, onUpdat
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [selectedDocs, setSelectedDocs] = useState<{ blob: Blob, name: string }[]>([]);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   React.useEffect(() => {
     if (initialEditId) {
@@ -66,7 +67,6 @@ export function Reports({ reports, officers, lang, initialEditId, onAdd, onUpdat
       }
     }
   }, [initialEditId, reports]);
-
   const [newReport, setNewReport] = useState<Omit<Report, 'id'>>({
     title: '',
     status: 'Pending Review',
@@ -197,7 +197,7 @@ export function Reports({ reports, officers, lang, initialEditId, onAdd, onUpdat
   const [currentStep, setCurrentStep] = useState(1);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
-  const recordingIntervalRef = React.useRef<NodeJS.Timeout | null>(null);
+  const recordingIntervalRef = React.useRef<any>(null);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const mediaRecorderRef = React.useRef<MediaRecorder | null>(null);
@@ -236,7 +236,7 @@ export function Reports({ reports, officers, lang, initialEditId, onAdd, onUpdat
           ? 'audio/mp4' 
           : 'audio/ogg';
 
-      const mediaRecorder = new MediaRecorder(stream, { mimeType });
+      const mediaRecorder = new NewMediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
       setRecordingDuration(0);
@@ -250,9 +250,13 @@ export function Reports({ reports, officers, lang, initialEditId, onAdd, onUpdat
       setIsRecording(true);
     } catch (err) {
       console.error(err);
-      alert(lang === 'am' ? 'ማይክሮፎን ማግኘት አልተቻለም' : 'Could not access microphone');
+      setErrorMessage(lang === 'am' ? 'ማይክሮፎን ማግኘት አልተቻለም (እባክዎን የፈቃድ ጥያቄውን ይቀበሉ)' : 'Could not access microphone (please allow access)');
     }
   };
+
+  // Helper alias since NewMediaRecorder doesn't exist, we use standard MediaRecorder
+  const NewMediaRecorder = window.MediaRecorder;
+
 
   const stopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
@@ -298,21 +302,23 @@ export function Reports({ reports, officers, lang, initialEditId, onAdd, onUpdat
     
     // Validation
     if (!newReport.title.trim() || newReport.title.length < 3) {
-      alert(lang === 'am' ? 'እባክዎ ትክክለኛ ርዕስ ያስገቡ (ቢያንስ 3 ፊደላት)' : 'Please enter a valid title (min 3 characters)');
+      setErrorMessage(lang === 'am' ? 'እባክዎ ትክክለኛ ርዕስ ያስገቡ (ቢያንስ 3 ፊደላት)' : 'Please enter a valid title (min 3 characters)');
       return;
     }
     if (!newReport.officerId) {
-      alert(lang === 'am' ? 'እባክዎ መኮንን ይምረጡ' : 'Please select an officer');
+      setErrorMessage(lang === 'am' ? 'እባክዎ መኮንን ይምረጡ' : 'Please select an officer');
       return;
     }
     if (!newReport.date) {
-      alert(lang === 'am' ? 'እባክዎ ቀን ይምረጡ' : 'Please select a date');
+      setErrorMessage(lang === 'am' ? 'እባክዎ ቀን ይምረጡ' : 'Please select a date');
       return;
     }
     if (!newReport.description?.trim() || newReport.description.length < 10) {
-      alert(lang === 'am' ? 'እባክዎ ዝርዝር መግለጫ ያስገቡ (ቢያንስ 10 ፊደላት)' : 'Please enter a detailed description (min 10 characters)');
+      setErrorMessage(lang === 'am' ? 'እባክዎ ዝርዝር መግለጫ ያስገቡ (ቢያንስ 10 ፊደላት)' : 'Please enter a detailed description (min 10 characters)');
       return;
     }
+
+    setErrorMessage(null);
 
     setIsSubmitting(true);
     try {
@@ -376,7 +382,7 @@ export function Reports({ reports, officers, lang, initialEditId, onAdd, onUpdat
       }, 2000);
     } catch (err) {
       console.error(err);
-      alert(lang === 'am' ? 'ሪፖርት ሲላክ ስህተት ተፈጥሯል' : 'Error submitting report');
+      setErrorMessage(lang === 'am' ? 'ሪፖርት ሲላክ ስህተት ተፈጥሯል (እባክዎን የኢንተርኔት ግንኙነትዎን ያረጋግጡ)' : 'Error submitting report (please verify your network connection)');
     } finally {
       setIsSubmitting(false);
     }
@@ -481,20 +487,20 @@ export function Reports({ reports, officers, lang, initialEditId, onAdd, onUpdat
                     </select>
                   </div>
 
-                  <div className="bg-brand-bg/50 p-4 rounded-xl border border-brand-border shadow-sm">
-                    <label className="block text-sm font-medium text-brand-text-secondary mb-2">{(t as any).trafficForm.accidentCause || 'Accident Cause'}</label>
-                    <select 
-                      className="input-field"
-                      value={newReport.trafficDetails?.accidentCause}
-                      onChange={(e) => setNewReport({...newReport, trafficDetails: {...newReport.trafficDetails, accidentCause: e.target.value}})}
-                    >
-                      <option value="Other">{(t as any).other || 'Other'}</option>
-                      <option value="Speeding">{lang === 'am' ? 'ከፍጥነት በላይ' : 'Speeding'}</option>
-                      <option value="DrunkDriving">{lang === 'am' ? 'በስካር መንዳት' : 'Drunk Driving'}</option>
-                      <option value="Technical">{lang === 'am' ? 'የቴክኒክ ችግር' : 'Technical Issue'}</option>
-                    </select>
+                    <div className="bg-brand-bg/50 p-4 rounded-xl border border-brand-border shadow-sm">
+                      <label className="block text-sm font-medium text-brand-text-secondary mb-2">{(t as any).trafficForm.accidentCause || 'Accident Cause'}</label>
+                      <select 
+                        className="input-field"
+                        value={newReport.trafficDetails?.accidentCause}
+                        onChange={(e) => setNewReport({...newReport, trafficDetails: {...newReport.trafficDetails, accidentCause: e.target.value}})}
+                      >
+                        <option value="Other">{(t as any).other || 'Other'}</option>
+                        <option value="Speeding">{lang === 'am' ? 'ከፍጥነት በላይ' : 'Speeding'}</option>
+                        <option value="DrunkDriving">{lang === 'am' ? 'በስካር መንዳት' : 'Drunk Driving'}</option>
+                        <option value="Technical">{lang === 'am' ? 'የቴክኒክ ችግር' : 'Technical Issue'}</option>
+                      </select>
+                    </div>
                   </div>
-                </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="bg-brand-bg/50 p-4 rounded-xl border border-brand-border shadow-sm">
@@ -846,6 +852,7 @@ export function Reports({ reports, officers, lang, initialEditId, onAdd, onUpdat
     setAudioBlob(null);
     setAudioUrl(null);
     setSelectedDocs([]);
+    setErrorMessage(null);
     setNewReport({ 
       title: '', 
       status: 'Pending Review', 
@@ -1081,6 +1088,13 @@ export function Reports({ reports, officers, lang, initialEditId, onAdd, onUpdat
               ))}
             </div>
 
+            {errorMessage && (
+              <div className="p-4 mb-6 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-lg text-sm flex items-center gap-2">
+                <AlertCircle size={18} />
+                <span>{errorMessage}</span>
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-8">
               <AnimatePresence mode="wait">
                 <motion.div
@@ -1105,23 +1119,24 @@ export function Reports({ reports, officers, lang, initialEditId, onAdd, onUpdat
                     {t.back}
                   </button>
                 )}
-                
+
                 {currentStep < 3 ? (
                   <button
                     type="button"
                     onClick={() => {
                       if (currentStep === 1) {
-                        if (!newReport.title) {
-                          alert(lang === 'am' ? 'እባክዎ ሁሉንም መስኮች ይሙሉ' : 'Please fill all fields');
+                        if (!newReport.title.trim()) {
+                          setErrorMessage(lang === 'am' ? 'እባክዎ የሪፖርቱን አርዕስት በትክክለኛ ሁኔታ ያስገቡ' : 'Please enter a valid report title');
                           return;
                         }
                       }
                       if (currentStep === 2) {
                         if (!newReport.filingStation || !newReport.officerId) {
-                          alert(lang === 'am' ? 'እባክዎ ሁሉንም መስኮች ይሙሉ' : 'Please fill all fields');
+                          setErrorMessage(lang === 'am' ? 'እባክዎ ጣቢያ እና መዝጋቢ መኮንን መምረጥዎን ያረጋግጡ' : 'Please make sure to select a station and recording officer');
                           return;
                         }
                       }
+                      setErrorMessage(null);
                       setCurrentStep(prev => prev + 1);
                     }}
                     className="btn-primary flex-1 flex items-center justify-center gap-2"
@@ -1132,10 +1147,7 @@ export function Reports({ reports, officers, lang, initialEditId, onAdd, onUpdat
                 ) : (
                   <button type="submit" className="btn-primary flex-1 flex items-center justify-center gap-2" disabled={isSubmitting}>
                     <Send size={18} />
-                    {isSubmitting
-                      ? (lang === 'am' ? 'በመላክ ላይ...' : 'Submitting...')
-                      : (editingReport ? t.saveProfile : t.submitReport)
-                    }
+                    {isSubmitting ? (lang === 'am' ? 'በመላክ ላይ...' : 'Submitting...') : (editingReport ? t.saveProfile : t.submitReport)}
                   </button>
                 )}
               </div>
